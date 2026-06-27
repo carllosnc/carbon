@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Carbon</string>
+    <string name="all_apps">All apps</string>
+    <string name="search_apps">Search apps</string>
+</resources>
