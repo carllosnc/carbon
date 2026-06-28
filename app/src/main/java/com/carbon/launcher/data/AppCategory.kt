@@ -14,5 +14,6 @@ enum class AppCategory(val label: String, val order: Int) {
     TRAVEL("Travel", 10),
     TOOLS("Tools", 11),
     AI("AI", 12),
+    DEBUG("Debug", 13),
     OTHER("Other", 99),
 }

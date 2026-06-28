@@ -6,8 +6,6 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,20 +16,26 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.carbon.launcher.data.AppCategory
 import com.carbon.launcher.data.AppModel
 
 fun Drawable.toImageBitmap() = when (this) {
@@ -45,25 +49,30 @@ fun Drawable.toImageBitmap() = when (this) {
     }.asImageBitmap()
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AppIcon(
     app: AppModel,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     showLabel: Boolean = true,
+    onLongClick: (() -> Unit)? = null,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
-            .padding(8.dp),
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+            )
+            .padding(horizontal = 4.dp, vertical = 8.dp),
     ) {
         Image(
             bitmap = app.icon.toImageBitmap(),
             contentDescription = app.label,
-            modifier = Modifier.size(48.dp),
+            modifier = Modifier.size(54.dp),
         )
         if (showLabel) {
             Text(
@@ -77,27 +86,6 @@ fun AppIcon(
     }
 }
 
-@Composable
-fun AppGrid(
-    apps: List<AppModel>,
-    onAppClick: (AppModel) -> Unit,
-    modifier: Modifier = Modifier,
-    columns: Int = 4,
-    showLabels: Boolean = true,
-) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(columns),
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        items(apps, key = { it.packageName }) { app ->
-            AppIcon(app = app, onClick = { onAppClick(app) }, showLabel = showLabels)
-        }
-    }
-}
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AppListRow(
@@ -105,6 +93,8 @@ fun AppListRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
+    hasBadge: Boolean = false,
+    badgeSubtitle: String? = null,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -115,20 +105,43 @@ fun AppListRow(
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 20.dp, vertical = 12.dp),
     ) {
+        Box(modifier = Modifier.size(56.dp)) {
             Image(
                 bitmap = app.icon.toImageBitmap(),
                 contentDescription = app.label,
                 modifier = Modifier
-                    .size(64.dp)
-                    .clip(RoundedCornerShape(16.dp)),
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(14.dp)),
             )
-        Text(
-            text = app.label,
-            color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.titleMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+            if (hasBadge) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = (-4).dp, y = 1.dp)
+                        .size(16.dp)
+                        .background(Color(0xFFFF4444), CircleShape)
+                        .border(2.dp, Color.White, CircleShape),
+                )
+            }
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = app.label,
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (badgeSubtitle != null) {
+                Text(
+                    text = badgeSubtitle,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
 
@@ -138,16 +151,20 @@ fun AppList(
     onAppClick: (AppModel) -> Unit,
     modifier: Modifier = Modifier,
     onAppLongClick: ((AppModel) -> Unit)? = null,
+    badgeSubtitles: Map<String, String> = emptyMap(),
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(vertical = 8.dp),
+        contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp),
     ) {
-        items(apps, key = { it.packageName }) { app ->
+        itemsIndexed(apps, key = { _, app -> app.packageName }) { _, app ->
+            val subtitle = badgeSubtitles[app.packageName]
             AppListRow(
                 app = app,
                 onClick = { onAppClick(app) },
                 onLongClick = onAppLongClick?.let { { it(app) } },
+                hasBadge = subtitle != null,
+                badgeSubtitle = subtitle,
             )
         }
     }

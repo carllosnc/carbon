@@ -1,14 +1,12 @@
 package com.carbon.launcher.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,11 +24,18 @@ fun ListItemRow(
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
     minHeight: androidx.compose.ui.unit.Dp = 56.dp,
+    onClick: (() -> Unit)? = null,
 ) {
+    val rowModifier = if (onClick != null) {
+        modifier.clickable(onClick = onClick)
+    } else {
+        modifier
+    }
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = modifier
+        modifier = rowModifier
             .fillMaxWidth()
             .heightIn(min = minHeight)
             .padding(horizontal = 16.dp, vertical = 8.dp),

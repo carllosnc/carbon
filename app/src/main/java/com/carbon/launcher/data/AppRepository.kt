@@ -72,14 +72,16 @@ class AppRepository(private val context: Context) {
             "safetycore", "vs_sim", "readera") to AppCategory.TOOLS,
     )
 
-    private val gameFlags = ApplicationInfo.FLAG_IS_GAME or
-        // Deprecated but still set on older installs.
-        (0x20000000) // FLAG_IS_GAME legacy
     private val gameKeywords = listOf(
         "game", "games", "clash", "candy", "minecraft", "pubg", "freefire",
         "codmobile", "honorofkings", "wildrift", "genshin", "honkai",
         "supercell", "riot", "amongus", "roblox", "fortnite", "playrix",
     )
+
+    private fun isGameWord(pkg: String, label: String): Boolean {
+        val wordRegex = Regex("\\b(game|games|clash|candy|minecraft|pubg|freefire|codmobile|honorofkings|wildrift|genshin|honkai|supercell|riot|amongus|roblox|fortnite|playrix)\\b", RegexOption.IGNORE_CASE)
+        return wordRegex.containsMatchIn(pkg) || wordRegex.containsMatchIn(label)
+    }
 
     suspend fun getInstalledApps(): List<AppModel> = withContext(Dispatchers.IO) {
         val ownPackage = context.packageName
@@ -90,7 +92,6 @@ class AppRepository(private val context: Context) {
             .distinctBy { it.packageName }
             .filter { it.packageName != ownPackage }
             .filter { it.enabled }
-            .filter { (it.flags and ApplicationInfo.FLAG_SYSTEM) == 0 }
             .map { it.toModel() }
             .sortedWith(compareBy({ it.category.order }, { it.label.lowercase() }))
     }
@@ -167,10 +168,13 @@ class AppRepository(private val context: Context) {
         val pkg = packageName.lowercase()
         val lbl = label.lowercase()
 
-        if (category == ApplicationInfo.CATEGORY_GAME ||
-            (flags and gameFlags) != 0 ||
-            gameKeywords.any { pkg.contains(it) || lbl.contains(it) }
-        ) return AppCategory.GAMES
+        if ((flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+            return AppCategory.DEBUG
+        }
+
+        if (category == ApplicationInfo.CATEGORY_GAME || isGameWord(pkg, lbl)) {
+            return AppCategory.GAMES
+        }
 
         for ((patterns, cat) in packageRules) {
             if (patterns.any { pkg.contains(it, ignoreCase = true) }) return cat
