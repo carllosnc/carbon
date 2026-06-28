@@ -1,5 +1,6 @@
 package com.carbon.launcher.ui.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,90 +15,98 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Wallpaper
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedIconButton
-import androidx.compose.material3.Switch
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.carbon.launcher.ui.components.ListItemRow
-import com.carbon.launcher.ui.theme.Grayscale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenUsageAccess: () -> Unit,
-    onSetWallpaper: () -> Unit,
+    onOpenNotificationAccess: () -> Unit,
+    onOpenDefaultLauncherSettings: () -> Unit,
+    onOpenWallpaperPicker: () -> Unit,
+    isUsageAccessGranted: Boolean,
+    isNotificationAccessGranted: Boolean,
+    isDefaultLauncher: Boolean,
+    appCount: Int,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        SettingsHeader(onBack = onBack)
-
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        topBar = { SettingsHeader(onBack = onBack) },
+    ) { innerPadding ->
         Column(
             modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
+                .fillMaxSize()
+                .padding(innerPadding)
                 .verticalScroll(rememberScrollState()),
         ) {
+            SettingsSectionTitle("Permissions & Status")
+            PermissionStatusRow(
+                title = "Usage access",
+                subtitle = "Shows cache and data sizes for installed apps",
+                isActive = isUsageAccessGranted,
+                leading = { SettingsIcon(Icons.Outlined.Security) },
+                onClick = onOpenUsageAccess,
+            )
+            PermissionStatusRow(
+                title = "Notification access",
+                subtitle = "Enables notification badges in the app list",
+                isActive = isNotificationAccessGranted,
+                leading = { SettingsIcon(Icons.Outlined.Notifications) },
+                onClick = onOpenNotificationAccess,
+            )
+            PermissionStatusRow(
+                title = "Default launcher",
+                subtitle = "Uses Carbon when you press the Home button",
+                isActive = isDefaultLauncher,
+                leading = { SettingsIcon(Icons.Outlined.Home) },
+                onClick = onOpenDefaultLauncherSettings,
+            )
+            ListItemRow(
+                title = "Installed apps",
+                subtitle = "$appCount apps found",
+                leading = { SettingsIcon(Icons.Outlined.Apps) },
+                trailing = { StatusBadge(text = "OK", isActive = true) },
+            )
+
+            HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 8.dp))
+
             SettingsSectionTitle("Appearance")
             ListItemRow(
                 title = "Wallpaper",
-                subtitle = "Change home screen wallpaper",
+                subtitle = "Change launcher wallpaper",
                 leading = { SettingsIcon(Icons.Outlined.Wallpaper) },
-                trailing = { SettingsArrow() },
-                modifier = Modifier,
+                onClick = onOpenWallpaperPicker,
             )
 
-            var grayscaleOnly by remember { mutableStateOf(true) }
-            ListItemRow(
-                title = "Grayscale theme",
-                subtitle = "Use only gray tones in the UI",
-                leading = { SettingsIcon(Icons.Outlined.Palette) },
-                trailing = {
-                    Switch(checked = grayscaleOnly, onCheckedChange = { grayscaleOnly = it })
-                },
-            )
 
-            HorizontalDivider(thickness = 1.dp, color = Grayscale.g05, modifier = Modifier.padding(vertical = 8.dp))
-
-            SettingsSectionTitle("System")
-            ListItemRow(
-                title = "Usage access",
-                subtitle = "Required to show app storage sizes",
-                leading = { SettingsIcon(Icons.Outlined.Security) },
-                trailing = {
-                    OutlinedIconButton(onClick = onOpenUsageAccess) {
-                        Text("Open", style = MaterialTheme.typography.labelSmall)
-                    }
-                },
-            )
-            ListItemRow(
-                title = "Default launcher",
-                subtitle = "Set Carbon as your home app",
-                leading = { SettingsIcon(Icons.Outlined.Apps) },
-                trailing = { SettingsArrow() },
-            )
-
-            HorizontalDivider(thickness = 1.dp, color = Grayscale.g05, modifier = Modifier.padding(vertical = 8.dp))
+            HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 8.dp))
 
             SettingsSectionTitle("About")
             ListItemRow(
@@ -106,9 +115,56 @@ fun SettingsScreen(
                 leading = { SettingsIcon(Icons.Outlined.Info) },
             )
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(24.dp).windowInsetsPadding(WindowInsets.navigationBars))
         }
     }
+}
+
+@Composable
+private fun PermissionStatusRow(
+    title: String,
+    subtitle: String,
+    isActive: Boolean,
+    leading: @Composable () -> Unit,
+    onClick: () -> Unit,
+) {
+    ListItemRow(
+        title = title,
+        subtitle = subtitle,
+        leading = leading,
+        onClick = onClick,
+        trailing = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StatusBadge(
+                    text = if (isActive) "Active" else "Missing",
+                    isActive = isActive,
+                )
+            }
+        },
+    )
+}
+
+@Composable
+private fun StatusBadge(
+    text: String,
+    isActive: Boolean,
+) {
+    val background = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer
+    val foreground = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer
+
+    Text(
+        text = text,
+        color = foreground,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(background)
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+    )
 }
 
 @Composable
@@ -116,6 +172,7 @@ private fun SettingsHeader(onBack: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.statusBars),
     ) {
         Row(
@@ -125,7 +182,7 @@ private fun SettingsHeader(onBack: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            OutlinedIconButton(onClick = onBack) {
+            IconButton(onClick = onBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
                     contentDescription = "Back",
@@ -171,14 +228,4 @@ private fun SettingsIcon(icon: androidx.compose.ui.graphics.vector.ImageVector) 
             modifier = Modifier.size(22.dp),
         )
     }
-}
-
-@Composable
-private fun SettingsArrow() {
-    Icon(
-        imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-        contentDescription = null,
-        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-        modifier = Modifier.size(20.dp),
-    )
 }
