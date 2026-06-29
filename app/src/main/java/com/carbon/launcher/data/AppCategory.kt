@@ -13,7 +13,8 @@ enum class AppCategory(val label: String, val order: Int) {
     HEALTH("Health", 9),
     TRAVEL("Travel", 10),
     TOOLS("Tools", 11),
-    AI("AI", 12),
-    DEBUG("Debug", 13),
+    SYSTEM("System", 12),
+    AI("AI", 13),
+    DEBUG("Debug", 14),
     OTHER("Other", 99),
 }

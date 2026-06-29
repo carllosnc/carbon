@@ -124,7 +124,7 @@ class AppRepository(private val context: Context) {
             packageName = packageName,
             label = label,
             icon = icon,
-            isSystem = (flags and ApplicationInfo.FLAG_SYSTEM) != 0,
+            isSystem = isSystemApp(),
             versionName = versionName,
             sizeMb = sizeMb,
             cacheMb = cacheMb,
@@ -164,12 +164,20 @@ class AppRepository(private val context: Context) {
         }
     }
 
+    private fun ApplicationInfo.isSystemApp(): Boolean =
+        (flags and ApplicationInfo.FLAG_SYSTEM) != 0 ||
+            (flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+
     private fun ApplicationInfo.categorize(label: String): AppCategory {
         val pkg = packageName.lowercase()
         val lbl = label.lowercase()
 
         if ((flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
             return AppCategory.DEBUG
+        }
+
+        if (isSystemApp()) {
+            return AppCategory.SYSTEM
         }
 
         if (category == ApplicationInfo.CATEGORY_GAME || isGameWord(pkg, lbl)) {
