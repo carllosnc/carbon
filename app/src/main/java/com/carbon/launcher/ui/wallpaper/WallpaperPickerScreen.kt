@@ -63,13 +63,19 @@ data class WallpaperItem(
 )
 
 private val wallpapers = listOf(
-    WallpaperItem(1, "Abstract Nature", R.drawable.bg),
-    WallpaperItem(2, "Mountain Lake", R.drawable.izdhan_imran_wqqyvqv0pri_unsplash),
-    WallpaperItem(3, "Forest Path", R.drawable.john_shaize_ngxnlhxpznw_unsplash),
-    WallpaperItem(4, "Mountain Peak", R.drawable.martin_martz_iug1rvch_8_unsplash),
-    WallpaperItem(5, "Rocky Landscape", R.drawable.martin_martz_qzx54uo868g_unsplash),
-    WallpaperItem(6, "Mountain View", R.drawable.martin_martz_tcxpjwit4w4_unsplash),
-    WallpaperItem(7, "Aerial Mountains", R.drawable.vitalii_khodzinskyi_4x_zk4iv8ny_unsplash),
+    WallpaperItem(1, "Aurora Drift", R.drawable.aurora_drift),
+    WallpaperItem(2, "Violet Haze", R.drawable.violet_haze),
+    WallpaperItem(3, "Prism Bloom", R.drawable.prism_bloom),
+    WallpaperItem(4, "Obsidian Wave", R.drawable.obsidian_wave),
+    WallpaperItem(5, "Liquid Sunrise", R.drawable.liquid_sunrise),
+    WallpaperItem(6, "Ember Mist", R.drawable.ember_mist),
+    WallpaperItem(7, "Lunar Current", R.drawable.lunar_current),
+    WallpaperItem(8, "Neon Fog", R.drawable.neon_fog),
+    WallpaperItem(9, "Cosmic Silk", R.drawable.cosmic_silk),
+    WallpaperItem(10, "Electric Orbit", R.drawable.electric_orbit),
+    WallpaperItem(11, "Shadow Glass", R.drawable.shadow_glass),
+    WallpaperItem(12, "Plasma Field", R.drawable.plasma_field),
+    WallpaperItem(13, "Midnight Flux", R.drawable.midnight_flux),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
