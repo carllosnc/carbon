@@ -22,7 +22,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,12 +31,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.carbon.launcher.data.AppModel
+import com.carbon.launcher.data.DockPref
 import com.carbon.launcher.data.NotificationBadgeService
 import com.carbon.launcher.data.WallpaperPref
 import com.carbon.launcher.ui.LauncherViewModel
@@ -60,6 +59,8 @@ class MainActivity : ComponentActivity() {
     private var notificationAccessGranted by mutableStateOf(false)
     private var defaultLauncher by mutableStateOf(false)
     private var wallpaperResId by mutableStateOf(0)
+    private var dockPackages by mutableStateOf<List<String>>(emptyList())
+    private var isDockCustomized by mutableStateOf(false)
     private val handler = Handler(Looper.getMainLooper())
 
     private val packageRemovedReceiver = object : BroadcastReceiver() {
@@ -79,12 +80,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.statusBarColor = 0x4D000000.toInt()
-        window.navigationBarColor = android.graphics.Color.BLACK
-        WindowInsetsControllerCompat(window, window.decorView).apply {
-            isAppearanceLightStatusBars = false
-            isAppearanceLightNavigationBars = false
-        }
         registerReceiver(
             packageRemovedReceiver,
             IntentFilter(Intent.ACTION_PACKAGE_REMOVED),
@@ -92,6 +87,8 @@ class MainActivity : ComponentActivity() {
         )
         refreshPermissionStatus()
         wallpaperResId = WallpaperPref.get(this)
+        dockPackages = DockPref.get(this)
+        isDockCustomized = DockPref.isConfigured(this)
         setContent {
             CarbonTheme {
                 val navController = rememberNavController()
@@ -142,6 +139,20 @@ class MainActivity : ComponentActivity() {
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
                     startActivity(intent)
+                }
+
+                fun addToDock(app: AppModel) {
+                    val updatedPackages = (dockPackages + app.packageName).distinct().take(5)
+                    dockPackages = updatedPackages
+                    isDockCustomized = true
+                    DockPref.save(this@MainActivity, updatedPackages)
+                }
+
+                fun removeFromDock(app: AppModel) {
+                    val updatedPackages = dockPackages.filterNot { it == app.packageName }
+                    dockPackages = updatedPackages
+                    isDockCustomized = true
+                    DockPref.save(this@MainActivity, updatedPackages)
                 }
 
                 Box(modifier = Modifier.fillMaxSize()) {
@@ -201,6 +212,13 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 badgeSubtitles = badgeSubtitles,
+                                dockPackages = dockPackages,
+                                isDockCustomized = isDockCustomized,
+                                onAddToDock = ::addToDock,
+                                onRemoveFromDock = ::removeFromDock,
+                                isUsageAccessGranted = usageAccessGranted,
+                                isNotificationAccessGranted = notificationAccessGranted,
+                                isDefaultLauncher = defaultLauncher,
                             )
                         }
                         composable(LauncherRoute.SETTINGS) {

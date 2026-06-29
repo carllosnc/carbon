@@ -1,37 +1,49 @@
 package com.carbon.launcher.ui.home
 
+import android.app.Activity
+import android.os.Build
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.Inventory2
-import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.SdStorage
 import androidx.compose.material.icons.outlined.Sell
 import androidx.compose.material.icons.outlined.Settings
@@ -47,7 +59,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -55,36 +66,52 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.background
-import androidx.compose.foundation.Image
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
-import java.io.File
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import androidx.core.view.WindowCompat
 import com.carbon.launcher.data.AppCategory
 import com.carbon.launcher.data.AppModel
 import com.carbon.launcher.ui.components.AppList
 import com.carbon.launcher.ui.components.ListItemRow
 import com.carbon.launcher.ui.components.toImageBitmap
+import kotlinx.coroutines.delay
+import java.io.File
 
 private enum class UninstallState { Idle, Confirming, Loading, Success }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun KeepHomeSystemBarsReadable(trigger: Boolean) {
+    val view = LocalView.current
+    LaunchedEffect(trigger) {
+        withFrameNanos { }
+        val window = (view.context as Activity).window
+        window.statusBarColor = Color.Transparent.toArgb()
+        window.navigationBarColor = Color.Transparent.toArgb()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
+        WindowCompat.getInsetsController(window, view).apply {
+            isAppearanceLightStatusBars = false
+            isAppearanceLightNavigationBars = false
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     apps: List<AppModel>,
@@ -97,12 +124,22 @@ fun HomeScreen(
     onUninstallResultConsumed: () -> Unit,
     onOpenSettings: () -> Unit,
     badgeSubtitles: Map<String, String> = emptyMap(),
+    dockPackages: List<String> = emptyList(),
+    isDockCustomized: Boolean = false,
+    onAddToDock: (AppModel) -> Unit,
+    onRemoveFromDock: (AppModel) -> Unit,
+    isUsageAccessGranted: Boolean = false,
+    isNotificationAccessGranted: Boolean = false,
+    isDefaultLauncher: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    val hasMissingPermission = !isUsageAccessGranted || !isNotificationAccessGranted || !isDefaultLauncher
     var longPressedApp by remember { mutableStateOf<AppModel?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var uninstallState by remember { mutableStateOf(UninstallState.Idle) }
     var uninstallTarget by remember { mutableStateOf<AppModel?>(null) }
+
+    KeepHomeSystemBarsReadable(longPressedApp != null || uninstallTarget != null)
 
     LaunchedEffect(uninstallResult) {
         when (uninstallResult) {
@@ -122,6 +159,14 @@ fun HomeScreen(
 
     var selectedLetter by remember { mutableStateOf<Char?>(null) }
     var selectedCategory by remember { mutableStateOf<AppCategory?>(null) }
+    val availableCategories = remember(apps) { apps.map { it.category }.toSet() }
+
+    LaunchedEffect(availableCategories, selectedCategory) {
+        if (selectedCategory != null && selectedCategory !in availableCategories) {
+            selectedCategory = null
+        }
+    }
+
     val filteredApps = remember(apps, selectedLetter, selectedCategory) {
         apps.filter { app ->
             val letterMatch = selectedLetter == null || app.label.firstOrNull()?.uppercaseChar() == selectedLetter
@@ -130,19 +175,23 @@ fun HomeScreen(
         }
     }
 
-    val dockApps = remember(apps) {
-        val slotPackages = listOf(
-            listOf("com.google.android.dialer", "com.android.dialer", "com.android.phone"),
-            listOf("com.android.vending"),
-            listOf("com.google.android.GoogleCamera", "com.android.camera", "org.codeaurora.snapcam"),
-            listOf("com.android.chrome", "com.brave.browser", "org.mozilla.firefox"),
-            listOf("com.google.android.apps.messaging", "com.android.mms", "com.whatsapp"),
-        )
+    val dockApps = remember(apps, dockPackages, isDockCustomized) {
         val appMap = apps.associateBy { it.packageName }
-        val matched = slotPackages.mapNotNull { candidates -> candidates.firstNotNullOfOrNull { appMap[it] } }
-        val usedPackages = matched.map { it.packageName }.toSet()
-        val remaining = apps.filter { it.packageName !in usedPackages }
-        (matched + remaining).take(5)
+        if (isDockCustomized) {
+            dockPackages.mapNotNull { appMap[it] }.take(5)
+        } else {
+            val slotPackages = listOf(
+                listOf("com.google.android.dialer", "com.android.dialer", "com.android.phone"),
+                listOf("com.android.vending"),
+                listOf("com.google.android.GoogleCamera", "com.android.camera", "org.codeaurora.snapcam"),
+                listOf("com.android.chrome", "com.brave.browser", "org.mozilla.firefox"),
+                listOf("com.google.android.apps.messaging", "com.android.mms", "com.whatsapp"),
+            )
+            val matched = slotPackages.mapNotNull { candidates -> candidates.firstNotNullOfOrNull { appMap[it] } }
+            val usedPackages = matched.map { it.packageName }.toSet()
+            val remaining = apps.filter { it.packageName !in usedPackages }
+            (matched + remaining).take(5)
+        }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -151,35 +200,58 @@ fun HomeScreen(
             LetterBar(selectedLetter = selectedLetter, onLetterClick = { letter ->
                 selectedLetter = if (selectedLetter == letter) null else letter
             })
-            CategoryFilter(selectedCategory = selectedCategory, onCategoryClick = { cat ->
-                selectedCategory = if (selectedCategory == cat) null else cat
-            })
+            CategoryFilter(
+                availableCategories = availableCategories,
+                selectedCategory = selectedCategory,
+                onCategoryClick = { cat ->
+                    selectedCategory = if (selectedCategory == cat) null else cat
+                },
+            )
 
             AppList(
                 apps = filteredApps,
                 onAppClick = onAppClick,
                 onAppLongClick = { longPressedApp = it },
                 badgeSubtitles = badgeSubtitles,
+                labelColor = Color.White,
+                subtitleColor = Color.White.copy(alpha = 0.68f),
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
 
-            DockRow(apps = dockApps, onAppClick = onAppClick)
+            DockRow(
+                apps = dockApps,
+                onAppClick = onAppClick,
+                onAppLongClick = { longPressedApp = it },
+            )
         }
 
-        FloatingActionButton(
-            onClick = onOpenSettings,
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .windowInsetsPadding(WindowInsets.navigationBars)
                 .padding(end = 20.dp, bottom = 116.dp),
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         ) {
-            Icon(
-                imageVector = Icons.Outlined.Settings,
-                contentDescription = "Open settings",
-                modifier = Modifier.size(24.dp),
-            )
+            FloatingActionButton(
+                onClick = onOpenSettings,
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Settings,
+                    contentDescription = "Open settings",
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            if (hasMissingPermission) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .offset(x = (-2).dp, y = (-2).dp)
+                        .size(16.dp)
+                        .background(Color(0xFFFF4444), CircleShape)
+                        .border(1.dp, Color.White, CircleShape),
+                )
+            }
         }
 
         longPressedApp?.let { app ->
@@ -191,6 +263,16 @@ fun HomeScreen(
             ) {
                 AppInfoSheet(
                     app = app,
+                    isInDock = isDockCustomized && app.packageName in dockPackages,
+                    canAddToDock = dockPackages.size < 5,
+                    onAddToDock = {
+                        longPressedApp = null
+                        onAddToDock(app)
+                    },
+                    onRemoveFromDock = {
+                        longPressedApp = null
+                        onRemoveFromDock(app)
+                    },
                     onUninstall = {
                         longPressedApp = null
                         uninstallTarget = app
@@ -261,9 +343,7 @@ fun HomeScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
-                                CircularProgressIndicator(
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
+                                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                                 Spacer(Modifier.height(16.dp))
                                 Text(
                                     text = "Uninstalling ${app.label}...",
@@ -315,6 +395,10 @@ fun HomeScreen(
 @Composable
 private fun AppInfoSheet(
     app: AppModel,
+    isInDock: Boolean,
+    canAddToDock: Boolean,
+    onAddToDock: () -> Unit,
+    onRemoveFromDock: () -> Unit,
     onUninstall: () -> Unit,
     onClearCache: (AppModel) -> Unit,
     onClearStorage: (AppModel) -> Unit,
@@ -330,7 +414,7 @@ private fun AppInfoSheet(
             title = app.label,
             minHeight = 72.dp,
             leading = {
-                androidx.compose.foundation.Image(
+                Image(
                     bitmap = app.icon.toImageBitmap(),
                     contentDescription = app.label,
                     modifier = Modifier.size(56.dp).clip(RoundedCornerShape(14.dp)),
@@ -347,17 +431,30 @@ private fun AppInfoSheet(
                 }
             },
         )
+        if (isInDock) {
+            ListItemRow(
+                title = "Remove from dock",
+                subtitle = "Keep this app out of the bottom dock",
+                leading = { LeadingIcon(Icons.Outlined.Apps) },
+                onClick = onRemoveFromDock,
+            )
+        } else if (canAddToDock) {
+            ListItemRow(
+                title = "Add to dock",
+                subtitle = "Pin this app to the bottom dock",
+                leading = { LeadingIcon(Icons.Outlined.Apps) },
+                onClick = onAddToDock,
+            )
+        } else {
+            ListItemRow(
+                title = "Dock is full",
+                subtitle = "Remove one pinned app before adding another",
+                leading = { LeadingIcon(Icons.Outlined.Apps) },
+            )
+        }
         HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 8.dp))
-        ListItemRow(
-            title = "Version",
-            subtitle = app.versionName,
-            leading = { LeadingIcon(Icons.Outlined.Star) },
-        )
-        ListItemRow(
-            title = "Size",
-            subtitle = app.sizeMb,
-            leading = { LeadingIcon(Icons.Outlined.Inventory2) },
-        )
+        ListItemRow(title = "Version", subtitle = app.versionName, leading = { LeadingIcon(Icons.Outlined.Star) })
+        ListItemRow(title = "Size", subtitle = app.sizeMb, leading = { LeadingIcon(Icons.Outlined.Inventory2) })
         ListItemRow(
             title = "Cache",
             subtitle = app.cacheMb,
@@ -378,27 +475,11 @@ private fun AppInfoSheet(
                 }
             },
         )
-        ListItemRow(
-            title = "Category",
-            subtitle = app.category.label,
-            leading = { LeadingIcon(Icons.Outlined.Category) },
-        )
-        ListItemRow(
-            title = "System app",
-            subtitle = if (app.isSystem) "Yes" else "No",
-            leading = { LeadingIcon(Icons.Outlined.Apps) },
-        )
-        ListItemRow(
-            title = "Installed",
-            subtitle = app.installDate,
-            leading = { LeadingIcon(Icons.Outlined.CalendarMonth) },
-        )
+        ListItemRow(title = "Category", subtitle = app.category.label, leading = { LeadingIcon(Icons.Outlined.Category) })
+        ListItemRow(title = "System app", subtitle = if (app.isSystem) "Yes" else "No", leading = { LeadingIcon(Icons.Outlined.Apps) })
+        ListItemRow(title = "Installed", subtitle = app.installDate, leading = { LeadingIcon(Icons.Outlined.CalendarMonth) })
         HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 8.dp))
-        ListItemRow(
-            title = "Package",
-            subtitle = app.packageName,
-            leading = { LeadingIcon(Icons.Outlined.Sell) },
-        )
+        ListItemRow(title = "Package", subtitle = app.packageName, leading = { LeadingIcon(Icons.Outlined.Sell) })
     }
 }
 
@@ -425,9 +506,7 @@ private fun LetterBar(
     selectedLetter: Char?,
     onLetterClick: (Char) -> Unit,
 ) {
-    val letters = remember {
-        ('A'..'Z').toList()
-    }
+    val letters = remember { ('A'..'Z').toList() }
     val scrollState = rememberScrollState()
     var containerWidth by remember { mutableStateOf(0) }
     val density = LocalDensity.current
@@ -449,14 +528,13 @@ private fun LetterBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .onSizeChanged { containerWidth = it.width }
-            .background(Color.Black.copy(alpha = 0.3f))
             .drawBehind {
                 val color = Color.White.copy(alpha = 0.15f)
                 val stroke = 1.dp.toPx()
                 drawLine(color, strokeWidth = stroke, start = Offset.Zero, end = Offset(size.width, 0f))
                 drawLine(color, strokeWidth = stroke, start = Offset(0f, size.height), end = Offset(size.width, size.height))
             }
+            .onSizeChanged { containerWidth = it.width }
             .horizontalScroll(scrollState)
             .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -467,11 +545,7 @@ private fun LetterBar(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(
-                        if (isSelected) Color.White
-                        else Color.Transparent,
-                        CircleShape,
-                    )
+                    .background(if (isSelected) Color.White else Color.Transparent, CircleShape)
                     .clickable { onLetterClick(letter) },
                 contentAlignment = Alignment.Center,
             ) {
@@ -498,8 +572,7 @@ private fun ClockWidget() {
     LaunchedEffect(Unit) {
         while (true) {
             val mi = android.app.ActivityManager.MemoryInfo()
-            (context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager)
-                .getMemoryInfo(mi)
+            (context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager).getMemoryInfo(mi)
             memTotal = mi.totalMem
             memUsed = mi.totalMem - mi.availMem
 
@@ -519,7 +592,6 @@ private fun ClockWidget() {
         modifier = Modifier
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.statusBars)
-            .background(Color.Black.copy(alpha = 0.3f))
             .padding(top = 24.dp, bottom = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -562,12 +634,7 @@ private fun MiniWidget(label: String, pct: Int, detail: String) {
             .background(Color.White.copy(alpha = 0.15f))
             .padding(horizontal = 24.dp, vertical = 14.dp),
     ) {
-        Text(
-            text = label,
-            color = Color.White.copy(alpha = 0.7f),
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 12.sp,
-        )
+        Text(text = label, color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall, fontSize = 12.sp)
         Spacer(Modifier.height(8.dp))
         Box(
             modifier = Modifier
@@ -585,26 +652,25 @@ private fun MiniWidget(label: String, pct: Int, detail: String) {
             )
         }
         Spacer(Modifier.height(8.dp))
-        Text(
-            text = detail,
-            color = Color.White.copy(alpha = 0.85f),
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 13.sp,
-        )
+        Text(text = detail, color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.labelSmall, fontSize = 13.sp)
     }
 }
 
 @Composable
 private fun CategoryFilter(
+    availableCategories: Set<AppCategory>,
     selectedCategory: AppCategory?,
     onCategoryClick: (AppCategory) -> Unit,
 ) {
-    val categories = remember { AppCategory.entries.sortedBy { it.order } }
-
+    val categories = remember(availableCategories) {
+        AppCategory.entries
+            .filter { it in availableCategories }
+            .sortedBy { it.order }
+    }
+    val scrollState = rememberScrollState()
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.Black.copy(alpha = 0.3f))
             .drawBehind {
                 drawLine(
                     color = Color.White.copy(alpha = 0.15f),
@@ -613,7 +679,7 @@ private fun CategoryFilter(
                     end = Offset(size.width, size.height),
                 )
             }
-            .horizontalScroll(rememberScrollState())
+            .horizontalScroll(scrollState)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -622,10 +688,7 @@ private fun CategoryFilter(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
-                    .background(
-                        if (isSelected) Color.White else Color.White.copy(alpha = 0.2f),
-                        RoundedCornerShape(20.dp),
-                    )
+                    .background(if (isSelected) Color.White else Color.White.copy(alpha = 0.2f), RoundedCornerShape(20.dp))
                     .clickable { onCategoryClick(category) }
                     .padding(horizontal = 18.dp, vertical = 10.dp),
             ) {
@@ -640,8 +703,13 @@ private fun CategoryFilter(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun DockRow(apps: List<AppModel>, onAppClick: (AppModel) -> Unit) {
+private fun DockRow(
+    apps: List<AppModel>,
+    onAppClick: (AppModel) -> Unit,
+    onAppLongClick: (AppModel) -> Unit,
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -656,32 +724,46 @@ private fun DockRow(apps: List<AppModel>, onAppClick: (AppModel) -> Unit) {
                 )
             },
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            apps.forEach { app ->
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .clickable { onAppClick(app) }
-                        .padding(8.dp),
-                ) {
-                    Image(
-                        bitmap = app.icon.toImageBitmap(),
-                        contentDescription = app.label,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(12.dp)),
+        AnimatedContent(
+            targetState = apps,
+            transitionSpec = {
+                (fadeIn(animationSpec = tween(durationMillis = 180)) +
+                    scaleIn(animationSpec = tween(durationMillis = 180), initialScale = 0.96f))
+                    .togetherWith(
+                        fadeOut(animationSpec = tween(durationMillis = 120)) +
+                            scaleOut(animationSpec = tween(durationMillis = 120), targetScale = 0.96f),
                     )
+            },
+            label = "dock-apps",
+        ) { targetApps ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                targetApps.forEach { app ->
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .combinedClickable(
+                                onClick = { onAppClick(app) },
+                                onLongClick = { onAppLongClick(app) },
+                            )
+                            .padding(8.dp),
+                    ) {
+                        Image(
+                            bitmap = app.icon.toImageBitmap(),
+                            contentDescription = app.label,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(12.dp)),
+                        )
+                    }
                 }
             }
         }
     }
 }
-
-
