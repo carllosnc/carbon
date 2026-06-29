@@ -1,7 +1,11 @@
 package com.carbon.launcher.ui.home
 
 import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.os.Build
+import android.view.View
+import android.view.Window
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -23,9 +27,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -47,6 +51,7 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.SdStorage
 import androidx.compose.material.icons.outlined.Sell
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -62,6 +67,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,12 +82,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import com.carbon.launcher.data.AppCategory
 import com.carbon.launcher.data.AppModel
@@ -93,20 +101,50 @@ import java.io.File
 
 private enum class UninstallState { Idle, Confirming, Loading, Success }
 
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+private fun applyReadableSystemBars(window: Window, view: View) {
+    window.statusBarColor = Color.Transparent.toArgb()
+    window.navigationBarColor = Color.Transparent.toArgb()
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        window.isNavigationBarContrastEnforced = false
+    }
+    WindowCompat.getInsetsController(window, view).apply {
+        isAppearanceLightStatusBars = false
+        isAppearanceLightNavigationBars = false
+    }
+}
+
 @Composable
 private fun KeepHomeSystemBarsReadable(trigger: Boolean) {
     val view = LocalView.current
+    val window = view.context.findActivity()?.window
+    SideEffect {
+        window?.let { applyReadableSystemBars(it, view) }
+    }
     LaunchedEffect(trigger) {
-        withFrameNanos { }
-        val window = (view.context as Activity).window
-        window.statusBarColor = Color.Transparent.toArgb()
-        window.navigationBarColor = Color.Transparent.toArgb()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            window.isNavigationBarContrastEnforced = false
+        repeat(if (trigger) 4 else 1) {
+            withFrameNanos { }
+            window?.let { applyReadableSystemBars(it, view) }
         }
-        WindowCompat.getInsetsController(window, view).apply {
-            isAppearanceLightStatusBars = false
-            isAppearanceLightNavigationBars = false
+    }
+}
+
+@Composable
+private fun KeepSheetSystemBarsReadable() {
+    val view = LocalView.current
+    val window = (view.parent as? DialogWindowProvider)?.window ?: view.context.findActivity()?.window
+    SideEffect {
+        window?.let { applyReadableSystemBars(it, view) }
+    }
+    LaunchedEffect(Unit) {
+        repeat(8) {
+            withFrameNanos { }
+            window?.let { applyReadableSystemBars(it, view) }
         }
     }
 }
@@ -123,6 +161,7 @@ fun HomeScreen(
     uninstallResult: Boolean?,
     onUninstallResultConsumed: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenQuickSettings: () -> Unit,
     badgeSubtitles: Map<String, String> = emptyMap(),
     dockPackages: List<String> = emptyList(),
     isDockCustomized: Boolean = false,
@@ -136,6 +175,7 @@ fun HomeScreen(
     val hasMissingPermission = !isUsageAccessGranted || !isNotificationAccessGranted || !isDefaultLauncher
     var longPressedApp by remember { mutableStateOf<AppModel?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetTopOffset = LocalConfiguration.current.screenHeightDp.dp * 0.1f
     var uninstallState by remember { mutableStateOf(UninstallState.Idle) }
     var uninstallTarget by remember { mutableStateOf<AppModel?>(null) }
 
@@ -225,32 +265,47 @@ fun HomeScreen(
             )
         }
 
-        Box(
+        Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .windowInsetsPadding(WindowInsets.navigationBars)
                 .padding(end = 20.dp, bottom = 116.dp),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             FloatingActionButton(
-                onClick = onOpenSettings,
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                onClick = onOpenQuickSettings,
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.Settings,
-                    contentDescription = "Open settings",
+                    imageVector = Icons.Outlined.Tune,
+                    contentDescription = "Open quick settings",
                     modifier = Modifier.size(24.dp),
                 )
             }
-            if (hasMissingPermission) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .offset(x = (-2).dp, y = (-2).dp)
-                        .size(16.dp)
-                        .background(Color(0xFFFF4444), CircleShape)
-                        .border(1.dp, Color.White, CircleShape),
-                )
+            Box {
+                FloatingActionButton(
+                    onClick = onOpenSettings,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Settings,
+                        contentDescription = "Open settings",
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+                if (hasMissingPermission) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .offset(x = (-2).dp, y = (-2).dp)
+                            .size(16.dp)
+                            .background(Color(0xFFFF4444), CircleShape)
+                            .border(1.dp, Color.White, CircleShape),
+                    )
+                }
             }
         }
 
@@ -258,9 +313,14 @@ fun HomeScreen(
             ModalBottomSheet(
                 onDismissRequest = { longPressedApp = null },
                 sheetState = sheetState,
+                modifier = Modifier
+                    .fillMaxHeight(0.9f)
+                    .offset(y = sheetTopOffset),
                 containerColor = MaterialTheme.colorScheme.surface,
                 scrimColor = Color.Black.copy(alpha = 0.5f),
+                contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
             ) {
+                KeepSheetSystemBarsReadable()
                 AppInfoSheet(
                     app = app,
                     isInDock = isDockCustomized && app.packageName in dockPackages,
@@ -405,8 +465,7 @@ private fun AppInfoSheet(
 ) {
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(max = 600.dp)
+            .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(vertical = 8.dp),
     ) {

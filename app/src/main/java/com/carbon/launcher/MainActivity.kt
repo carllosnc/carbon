@@ -41,6 +41,7 @@ import com.carbon.launcher.data.NotificationBadgeService
 import com.carbon.launcher.data.WallpaperPref
 import com.carbon.launcher.ui.LauncherViewModel
 import com.carbon.launcher.ui.home.HomeScreen
+import com.carbon.launcher.ui.quicksettings.QuickSettingsScreen
 import com.carbon.launcher.ui.settings.SettingsScreen
 import com.carbon.launcher.ui.theme.CarbonTheme
 import com.carbon.launcher.ui.wallpaper.WallpaperPickerScreen
@@ -48,6 +49,7 @@ import com.carbon.launcher.ui.wallpaper.WallpaperPickerScreen
 private object LauncherRoute {
     const val HOME = "home"
     const val SETTINGS = "settings"
+    const val QUICK_SETTINGS = "quick_settings"
     const val WALLPAPER = "wallpaper"
 }
 
@@ -141,6 +143,48 @@ class MainActivity : ComponentActivity() {
                     startActivity(intent)
                 }
 
+                fun openWifiSettings() {
+                    val intent = Intent(Settings.ACTION_WIFI_SETTINGS).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                }
+
+                fun openBluetoothSettings() {
+                    val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                }
+
+                fun openNetworkSettings() {
+                    val intent = Intent(Settings.ACTION_WIRELESS_SETTINGS).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                }
+
+                fun openDisplaySettings() {
+                    val intent = Intent(Settings.ACTION_DISPLAY_SETTINGS).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                }
+
+                fun openSoundSettings() {
+                    val intent = Intent(Settings.ACTION_SOUND_SETTINGS).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                }
+
+                fun openBatterySettings() {
+                    val intent = Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                }
+
                 fun addToDock(app: AppModel) {
                     val updatedPackages = (dockPackages + app.packageName).distinct().take(5)
                     dockPackages = updatedPackages
@@ -211,6 +255,11 @@ class MainActivity : ComponentActivity() {
                                         launchSingleTop = true
                                     }
                                 },
+                                onOpenQuickSettings = {
+                                    navController.navigate(LauncherRoute.QUICK_SETTINGS) {
+                                        launchSingleTop = true
+                                    }
+                                },
                                 badgeSubtitles = badgeSubtitles,
                                 dockPackages = dockPackages,
                                 isDockCustomized = isDockCustomized,
@@ -236,6 +285,17 @@ class MainActivity : ComponentActivity() {
                                 isNotificationAccessGranted = notificationAccessGranted,
                                 isDefaultLauncher = defaultLauncher,
                                 appCount = state.apps.size,
+                            )
+                        }
+                        composable(LauncherRoute.QUICK_SETTINGS) {
+                            QuickSettingsScreen(
+                                onBack = { navController.popBackStack() },
+                                onOpenWifi = ::openWifiSettings,
+                                onOpenBluetooth = ::openBluetoothSettings,
+                                onOpenNetwork = ::openNetworkSettings,
+                                onOpenDisplay = ::openDisplaySettings,
+                                onOpenSound = ::openSoundSettings,
+                                onOpenBattery = ::openBatterySettings,
                             )
                         }
                         composable(LauncherRoute.WALLPAPER) {
