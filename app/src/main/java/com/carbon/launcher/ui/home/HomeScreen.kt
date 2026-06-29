@@ -23,6 +23,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -37,7 +38,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -48,6 +53,7 @@ import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.SdStorage
 import androidx.compose.material.icons.outlined.Sell
 import androidx.compose.material.icons.outlined.Settings
@@ -161,6 +167,7 @@ fun HomeScreen(
     uninstallResult: Boolean?,
     onUninstallResultConsumed: () -> Unit,
     onOpenSettings: () -> Unit,
+    onLockScreen: () -> Unit,
     onOpenQuickSettings: () -> Unit,
     badgeSubtitles: Map<String, String> = emptyMap(),
     dockPackages: List<String> = emptyList(),
@@ -170,9 +177,10 @@ fun HomeScreen(
     isUsageAccessGranted: Boolean = false,
     isNotificationAccessGranted: Boolean = false,
     isDefaultLauncher: Boolean = false,
+    isLockScreenAdminGranted: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val hasMissingPermission = !isUsageAccessGranted || !isNotificationAccessGranted || !isDefaultLauncher
+    val hasMissingPermission = !isUsageAccessGranted || !isNotificationAccessGranted || !isDefaultLauncher || !isLockScreenAdminGranted
     var longPressedApp by remember { mutableStateOf<AppModel?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val sheetTopOffset = LocalConfiguration.current.screenHeightDp.dp * 0.1f
@@ -200,10 +208,22 @@ fun HomeScreen(
     var selectedLetter by remember { mutableStateOf<Char?>(null) }
     var selectedCategory by remember { mutableStateOf<AppCategory?>(null) }
     val availableCategories = remember(apps) { apps.map { it.category }.toSet() }
+    val availableLetters = remember(apps, selectedCategory) {
+        apps
+            .filter { app -> selectedCategory == null || app.category == selectedCategory }
+            .mapNotNull { app -> app.label.firstOrNull()?.uppercaseChar() }
+            .filter { it in 'A'..'Z' }
+            .toSet()
+    }
 
     LaunchedEffect(availableCategories, selectedCategory) {
         if (selectedCategory != null && selectedCategory !in availableCategories) {
             selectedCategory = null
+        }
+    }
+    LaunchedEffect(availableLetters, selectedLetter) {
+        if (selectedLetter != null && selectedLetter !in availableLetters) {
+            selectedLetter = null
         }
     }
 
@@ -237,7 +257,7 @@ fun HomeScreen(
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             ClockWidget()
-            LetterBar(selectedLetter = selectedLetter, onLetterClick = { letter ->
+            LetterBar(availableLetters = availableLetters, selectedLetter = selectedLetter, onLetterClick = { letter ->
                 selectedLetter = if (selectedLetter == letter) null else letter
             })
             CategoryFilter(
@@ -281,6 +301,17 @@ fun HomeScreen(
                 Icon(
                     imageVector = Icons.Outlined.Tune,
                     contentDescription = "Open quick settings",
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            FloatingActionButton(
+                onClick = onLockScreen,
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Lock,
+                    contentDescription = "Lock screen",
                     modifier = Modifier.size(24.dp),
                 )
             }
@@ -562,10 +593,11 @@ private fun LeadingIcon(
 
 @Composable
 private fun LetterBar(
+    availableLetters: Set<Char>,
     selectedLetter: Char?,
     onLetterClick: (Char) -> Unit,
 ) {
-    val letters = remember { ('A'..'Z').toList() }
+    val letters = remember(availableLetters) { ('A'..'Z').filter { it in availableLetters } }
     val scrollState = rememberScrollState()
     var containerWidth by remember { mutableStateOf(0) }
     val density = LocalDensity.current
@@ -715,6 +747,7 @@ private fun MiniWidget(label: String, pct: Int, detail: String) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun CategoryFilter(
     availableCategories: Set<AppCategory>,
@@ -726,8 +759,8 @@ private fun CategoryFilter(
             .filter { it in availableCategories }
             .sortedBy { it.order }
     }
-    val scrollState = rememberScrollState()
-    Row(
+
+    LazyRow(
         modifier = Modifier
             .fillMaxWidth()
             .drawBehind {
@@ -737,15 +770,23 @@ private fun CategoryFilter(
                     start = Offset(0f, size.height),
                     end = Offset(size.width, size.height),
                 )
-            }
-            .horizontalScroll(scrollState)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            },
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        categories.forEach { category ->
+        items(categories, key = { it.name }) { category ->
             val isSelected = category == selectedCategory
+            val bringIntoViewRequester = remember { BringIntoViewRequester() }
+
+            LaunchedEffect(isSelected, selectedCategory) {
+                if (isSelected) {
+                    bringIntoViewRequester.bringIntoView()
+                }
+            }
+
             Box(
                 modifier = Modifier
+                    .bringIntoViewRequester(bringIntoViewRequester)
                     .clip(RoundedCornerShape(20.dp))
                     .background(if (isSelected) Color.White else Color.White.copy(alpha = 0.2f), RoundedCornerShape(20.dp))
                     .clickable { onCategoryClick(category) }
@@ -761,7 +802,6 @@ private fun CategoryFilter(
         }
     }
 }
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DockRow(

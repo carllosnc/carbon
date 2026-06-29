@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Wallpaper
@@ -47,10 +48,12 @@ fun SettingsScreen(
     onOpenUsageAccess: () -> Unit,
     onOpenNotificationAccess: () -> Unit,
     onOpenDefaultLauncherSettings: () -> Unit,
+    onOpenLockScreenAdminSettings: () -> Unit,
     onOpenWallpaperPicker: () -> Unit,
     isUsageAccessGranted: Boolean,
     isNotificationAccessGranted: Boolean,
     isDefaultLauncher: Boolean,
+    isLockScreenAdminGranted: Boolean,
     appCount: Int,
     modifier: Modifier = Modifier,
 ) {
@@ -87,6 +90,13 @@ fun SettingsScreen(
                 isActive = isDefaultLauncher,
                 leading = { SettingsIcon(Icons.Outlined.Home) },
                 onClick = onOpenDefaultLauncherSettings,
+            )
+            PermissionStatusRow(
+                title = "Lock screen admin",
+                subtitle = "Allows Carbon to lock the screen",
+                isActive = isLockScreenAdminGranted,
+                leading = { SettingsIcon(Icons.Outlined.Lock) },
+                onClick = onOpenLockScreenAdminSettings,
             )
             ListItemRow(
                 title = "Installed apps",

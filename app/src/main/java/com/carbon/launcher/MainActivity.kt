@@ -1,6 +1,8 @@
 package com.carbon.launcher
 
 import android.app.AppOpsManager
+import android.app.admin.DevicePolicyManager
+import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
@@ -13,6 +15,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Process
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -37,6 +40,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.carbon.launcher.data.AppModel
 import com.carbon.launcher.data.DockPref
+import com.carbon.launcher.data.LockDeviceAdminReceiver
 import com.carbon.launcher.data.NotificationBadgeService
 import com.carbon.launcher.data.WallpaperPref
 import com.carbon.launcher.ui.LauncherViewModel
@@ -60,6 +64,7 @@ class MainActivity : ComponentActivity() {
     private var usageAccessGranted by mutableStateOf(false)
     private var notificationAccessGranted by mutableStateOf(false)
     private var defaultLauncher by mutableStateOf(false)
+    private var lockScreenAdminGranted by mutableStateOf(false)
     private var wallpaperResId by mutableStateOf(0)
     private var dockPackages by mutableStateOf<List<String>>(emptyList())
     private var isDockCustomized by mutableStateOf(false)
@@ -185,6 +190,39 @@ class MainActivity : ComponentActivity() {
                     startActivity(intent)
                 }
 
+
+                fun openLockScreenAdminSettings() {
+                    val adminComponent = ComponentName(this@MainActivity, LockDeviceAdminReceiver::class.java)
+                    val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                        putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent)
+                        putExtra(
+                            DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                            "Allow Carbon to lock the screen from the launcher.",
+                        )
+                    }
+                    try {
+                        startActivity(intent)
+                    } catch (_: ActivityNotFoundException) {
+                        startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
+                    }
+                }
+
+                fun lockScreen() {
+                    val devicePolicyManager = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+                    val adminComponent = ComponentName(this@MainActivity, LockDeviceAdminReceiver::class.java)
+                    if (devicePolicyManager.isAdminActive(adminComponent)) {
+                        try {
+                            devicePolicyManager.lockNow()
+                        } catch (_: SecurityException) {
+                            Toast.makeText(this@MainActivity, "Enable lock screen permission first", Toast.LENGTH_SHORT).show()
+                            openLockScreenAdminSettings()
+                        }
+                    } else {
+                        Toast.makeText(this@MainActivity, "Enable lock screen permission first", Toast.LENGTH_SHORT).show()
+                        openLockScreenAdminSettings()
+                    }
+                }
+
                 fun addToDock(app: AppModel) {
                     val updatedPackages = (dockPackages + app.packageName).distinct().take(5)
                     dockPackages = updatedPackages
@@ -255,6 +293,7 @@ class MainActivity : ComponentActivity() {
                                         launchSingleTop = true
                                     }
                                 },
+                                onLockScreen = ::lockScreen,
                                 onOpenQuickSettings = {
                                     navController.navigate(LauncherRoute.QUICK_SETTINGS) {
                                         launchSingleTop = true
@@ -268,6 +307,7 @@ class MainActivity : ComponentActivity() {
                                 isUsageAccessGranted = usageAccessGranted,
                                 isNotificationAccessGranted = notificationAccessGranted,
                                 isDefaultLauncher = defaultLauncher,
+                                isLockScreenAdminGranted = lockScreenAdminGranted,
                             )
                         }
                         composable(LauncherRoute.SETTINGS) {
@@ -276,6 +316,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenUsageAccess = ::openUsageAccess,
                                 onOpenNotificationAccess = ::openNotificationAccess,
                                 onOpenDefaultLauncherSettings = ::openDefaultLauncherSettings,
+                                onOpenLockScreenAdminSettings = ::openLockScreenAdminSettings,
                                 onOpenWallpaperPicker = {
                                     navController.navigate(LauncherRoute.WALLPAPER) {
                                         launchSingleTop = true
@@ -284,6 +325,7 @@ class MainActivity : ComponentActivity() {
                                 isUsageAccessGranted = usageAccessGranted,
                                 isNotificationAccessGranted = notificationAccessGranted,
                                 isDefaultLauncher = defaultLauncher,
+                                isLockScreenAdminGranted = lockScreenAdminGranted,
                                 appCount = state.apps.size,
                             )
                         }
@@ -334,6 +376,7 @@ class MainActivity : ComponentActivity() {
         usageAccessGranted = hasUsageAccess()
         notificationAccessGranted = hasNotificationAccess()
         defaultLauncher = isDefaultLauncher()
+        lockScreenAdminGranted = hasLockScreenAdmin()
     }
 
     private fun hasUsageAccess(): Boolean {
@@ -355,6 +398,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+
+    private fun hasLockScreenAdmin(): Boolean {
+        val devicePolicyManager = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        val adminComponent = ComponentName(this, LockDeviceAdminReceiver::class.java)
+        return devicePolicyManager.isAdminActive(adminComponent)
+    }
     private fun isDefaultLauncher(): Boolean {
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         val resolved = packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)
