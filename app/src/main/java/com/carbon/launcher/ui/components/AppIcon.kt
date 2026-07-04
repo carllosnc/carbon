@@ -124,7 +124,7 @@ fun AppListRow(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .offset(x = (-4).dp, y = 1.dp)
+                        .offset(x = 4.dp, y = (-4).dp)
                         .size(16.dp)
                         .background(Color(0xFFFF4444), CircleShape)
                         .border(2.dp, Color.White, CircleShape),
