@@ -1,9 +1,14 @@
 package com.carbon.launcher.ui.settings
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -20,9 +25,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.ArrowDownward
-import androidx.compose.material.icons.outlined.ArrowUpward
-import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.outlined.DragHandle
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,14 +37,25 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.carbon.launcher.data.AppCategory
+import kotlin.math.roundToInt
+import android.view.HapticFeedbackConstants
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,12 +67,11 @@ fun CategoryOrderScreen(
     modifier: Modifier = Modifier,
 ) {
     var categories by remember(categoryOrder) { mutableStateOf(normalizeCategoryOrder(categoryOrder)) }
-
-    fun moveCategory(from: Int, to: Int) {
-        if (to !in categories.indices) return
-        categories = categories.move(from, to)
-        onOrderChange(categories)
-    }
+    var draggedIndex by remember { mutableIntStateOf(-1) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var slotHeightPx by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
+    val view = LocalView.current
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -70,12 +83,13 @@ fun CategoryOrderScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
+            userScrollEnabled = draggedIndex < 0,
         ) {
             item {
                 Text(
-                    text = "Use the arrow buttons to change how filters and app groups are shown.",
+                    text = "Long-press and drag to reorder categories.",
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.64f),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
@@ -86,11 +100,37 @@ fun CategoryOrderScreen(
                     category = category,
                     appCount = categoryCounts[category] ?: 0,
                     position = index + 1,
-                    canMoveUp = index > 0,
-                    canMoveDown = index < categories.lastIndex,
-                    onMoveUp = { moveCategory(index, index - 1) },
-                    onMoveDown = { moveCategory(index, index + 1) },
-                    modifier = Modifier.animateItem(),
+                    index = index,
+                    isDragged = draggedIndex == index,
+                    dragOffset = dragOffset,
+                    draggedIndex = draggedIndex,
+                    slotHeightPx = slotHeightPx,
+                    onDragStart = {
+                        draggedIndex = index
+                        dragOffset = 0f
+                    },
+                    onDrag = { delta ->
+                        dragOffset += delta
+                    },
+                    onDragEnd = {
+                        if (slotHeightPx > 0f) {
+                            val shift = (dragOffset / slotHeightPx).roundToInt()
+                            val to = (draggedIndex + shift).coerceIn(0, categories.lastIndex)
+                            if (to != draggedIndex) {
+                                categories = categories.move(draggedIndex, to)
+                                onOrderChange(categories)
+                                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                            }
+                        }
+                        draggedIndex = -1
+                        dragOffset = 0f
+                    },
+                    onSizeChanged = { height ->
+                        if (slotHeightPx == 0f) {
+                            slotHeightPx = height + with(density) { 10.dp.toPx() }
+                        }
+                    },
+                    modifier = Modifier,
                 )
             }
             item {
@@ -105,14 +145,76 @@ private fun CategoryOrderRow(
     category: AppCategory,
     appCount: Int,
     position: Int,
-    canMoveUp: Boolean,
-    canMoveDown: Boolean,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
+    index: Int,
+    isDragged: Boolean,
+    dragOffset: Float,
+    draggedIndex: Int,
+    slotHeightPx: Float,
+    onDragStart: () -> Unit,
+    onDrag: (Float) -> Unit,
+    onDragEnd: () -> Unit,
+    onSizeChanged: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val projectedIndex = if (draggedIndex >= 0 && slotHeightPx > 0f) {
+        (draggedIndex + (dragOffset / slotHeightPx).roundToInt()).coerceIn(0, Int.MAX_VALUE)
+    } else {
+        -1
+    }
+
+    val shiftPx = when {
+        isDragged -> dragOffset
+        draggedIndex >= 0 && index in minOf(draggedIndex, projectedIndex)..maxOf(draggedIndex, projectedIndex) -> {
+            if (draggedIndex < projectedIndex) -slotHeightPx else slotHeightPx
+        }
+        else -> 0f
+    }
+
+    val animatedShiftPx by animateFloatAsState(
+        targetValue = shiftPx,
+        animationSpec = if (draggedIndex >= 0) spring(stiffness = 600f) else snap(),
+        label = "row-shift",
+    )
+
+    val elevation by animateFloatAsState(
+        targetValue = if (isDragged) 8f else 0f,
+        label = "card-elevation",
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (isDragged) 1.04f else 1f,
+        label = "card-scale",
+    )
+    val rotation by animateFloatAsState(
+        targetValue = if (isDragged) 3f else 0f,
+        label = "card-rotation",
+    )
+
+    val currentOnDragStart by rememberUpdatedState(onDragStart)
+    val currentOnDrag by rememberUpdatedState(onDrag)
+    val currentOnDragEnd by rememberUpdatedState(onDragEnd)
+
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .onSizeChanged { onSizeChanged(it.height.toFloat()) }
+            .graphicsLayer {
+                translationY = animatedShiftPx
+                shadowElevation = elevation
+                scaleX = scale
+                scaleY = scale
+                rotationZ = rotation
+            }
+            .pointerInput(category) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { currentOnDragStart() },
+                    onDrag = { change, offset ->
+                        change.consume()
+                        currentOnDrag(offset.y)
+                    },
+                    onDragEnd = { currentOnDragEnd() },
+                    onDragCancel = { currentOnDragEnd() },
+                )
+            },
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
@@ -124,10 +226,19 @@ private fun CategoryOrderRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            Icon(
+                imageVector = Icons.Outlined.DragHandle,
+                contentDescription = "Drag to reorder",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.48f),
+                modifier = Modifier.size(28.dp),
+            )
             Box(
                 modifier = Modifier
                     .size(38.dp)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f), RoundedCornerShape(14.dp)),
+                    .background(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                        RoundedCornerShape(14.dp),
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -152,38 +263,6 @@ private fun CategoryOrderRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.62f),
                     style = MaterialTheme.typography.bodySmall,
                 )
-            }
-            Icon(
-                imageVector = Icons.Outlined.Category,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.36f),
-                modifier = Modifier.size(20.dp),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                IconButton(
-                    onClick = onMoveUp,
-                    enabled = canMoveUp,
-                    modifier = Modifier.size(42.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.ArrowUpward,
-                        contentDescription = "Move up",
-                        tint = if (canMoveUp) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.26f),
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-                IconButton(
-                    onClick = onMoveDown,
-                    enabled = canMoveDown,
-                    modifier = Modifier.size(42.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.ArrowDownward,
-                        contentDescription = "Move down",
-                        tint = if (canMoveDown) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.26f),
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
             }
         }
     }
