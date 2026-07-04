@@ -20,10 +20,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Wallpaper
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -49,11 +51,17 @@ fun SettingsScreen(
     onOpenNotificationAccess: () -> Unit,
     onOpenDefaultLauncherSettings: () -> Unit,
     onOpenLockScreenAdminSettings: () -> Unit,
+    onOpenWriteSettings: () -> Unit,
+    onOpenNotificationPolicyAccess: () -> Unit,
     onOpenWallpaperPicker: () -> Unit,
+    onOpenCategoryOrder: () -> Unit,
     isUsageAccessGranted: Boolean,
     isNotificationAccessGranted: Boolean,
     isDefaultLauncher: Boolean,
     isLockScreenAdminGranted: Boolean,
+    isWriteSettingsGranted: Boolean,
+    isNotificationPolicyAccessGranted: Boolean,
+    isDeveloperModeEnabled: Boolean,
     appCount: Int,
     modifier: Modifier = Modifier,
 ) {
@@ -69,7 +77,7 @@ fun SettingsScreen(
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState()),
         ) {
-            SettingsSectionTitle("Permissions & Status")
+            SettingsSectionTitle("Permissions")
             PermissionStatusRow(
                 title = "Usage access",
                 subtitle = "Shows cache and data sizes for installed apps",
@@ -98,11 +106,44 @@ fun SettingsScreen(
                 leading = { SettingsIcon(Icons.Outlined.Lock) },
                 onClick = onOpenLockScreenAdminSettings,
             )
+            PermissionStatusRow(
+                title = "Write system settings",
+                subtitle = "Controls brightness and auto rotate",
+                isActive = isWriteSettingsGranted,
+                leading = { SettingsIcon(Icons.Outlined.Settings) },
+                onClick = onOpenWriteSettings,
+            )
+            PermissionStatusRow(
+                title = "Notification policy access",
+                subtitle = "Controls Do Not Disturb",
+                isActive = isNotificationPolicyAccessGranted,
+                leading = { SettingsIcon(Icons.Outlined.Notifications) },
+                onClick = onOpenNotificationPolicyAccess,
+            )
+            HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 8.dp))
+
+            SettingsSectionTitle("Status")
+            ListItemRow(
+                title = "Developer mode",
+                subtitle = "Android developer options status",
+                leading = { SettingsIcon(Icons.Outlined.Info) },
+                trailing = { StatusBadge(text = if (isDeveloperModeEnabled) "ON" else "OFF", isActive = isDeveloperModeEnabled) },
+            )
             ListItemRow(
                 title = "Installed apps",
                 subtitle = "$appCount apps found",
                 leading = { SettingsIcon(Icons.Outlined.Apps) },
                 trailing = { StatusBadge(text = "OK", isActive = true) },
+            )
+
+            HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 8.dp))
+
+            SettingsSectionTitle("Organization")
+            ListItemRow(
+                title = "Categories",
+                subtitle = "Reorder category filters",
+                leading = { SettingsIcon(Icons.Outlined.Category) },
+                onClick = onOpenCategoryOrder,
             )
 
             HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 8.dp))
@@ -239,3 +280,6 @@ private fun SettingsIcon(icon: androidx.compose.ui.graphics.vector.ImageVector) 
         )
     }
 }
+
+
+

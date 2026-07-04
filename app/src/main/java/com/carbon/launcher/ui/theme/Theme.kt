@@ -4,6 +4,7 @@ import android.app.Activity
 import android.os.Build
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
@@ -13,9 +14,10 @@ import androidx.core.view.WindowCompat
 
 @Composable
 fun CarbonTheme(
+    darkTheme: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val colorScheme = darkColorScheme()
+    val colorScheme = if (darkTheme) darkColorScheme() else lightColorScheme()
     val view = LocalView.current
 
     if (!view.isInEditMode) {
@@ -27,8 +29,8 @@ fun CarbonTheme(
                 window.isNavigationBarContrastEnforced = false
             }
             WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = false
-                isAppearanceLightNavigationBars = false
+                isAppearanceLightStatusBars = !darkTheme
+                isAppearanceLightNavigationBars = !darkTheme
             }
         }
     }

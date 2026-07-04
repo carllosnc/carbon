@@ -85,6 +85,7 @@ class AppRepository(private val context: Context) {
 
     suspend fun getInstalledApps(): List<AppModel> = withContext(Dispatchers.IO) {
         val ownPackage = context.packageName
+        val categoryOrder = CategoryOrderPref.orderMap(context)
 
         val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         pm.queryIntentActivities(launcherIntent, PackageManager.GET_META_DATA)
@@ -93,7 +94,7 @@ class AppRepository(private val context: Context) {
             .filter { it.packageName != ownPackage }
             .filter { it.enabled }
             .map { it.toModel() }
-            .sortedWith(compareBy({ it.category.order }, { it.label.lowercase() }))
+            .sortedWith(compareBy({ categoryOrder[it.category] ?: it.category.order }, { it.label.lowercase() }))
     }
 
     private fun ApplicationInfo.toModel(): AppModel {
@@ -201,3 +202,4 @@ class AppRepository(private val context: Context) {
         }
     }
 }
+

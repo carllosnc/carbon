@@ -169,6 +169,7 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onLockScreen: () -> Unit,
     onOpenQuickSettings: () -> Unit,
+    categoryOrder: List<AppCategory> = AppCategory.entries.sortedBy { it.order },
     badgeSubtitles: Map<String, String> = emptyMap(),
     dockPackages: List<String> = emptyList(),
     isDockCustomized: Boolean = false,
@@ -178,9 +179,11 @@ fun HomeScreen(
     isNotificationAccessGranted: Boolean = false,
     isDefaultLauncher: Boolean = false,
     isLockScreenAdminGranted: Boolean = false,
+    isWriteSettingsGranted: Boolean = false,
+    isNotificationPolicyAccessGranted: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val hasMissingPermission = !isUsageAccessGranted || !isNotificationAccessGranted || !isDefaultLauncher || !isLockScreenAdminGranted
+    val hasMissingPermission = !isUsageAccessGranted || !isNotificationAccessGranted || !isDefaultLauncher || !isLockScreenAdminGranted || !isWriteSettingsGranted || !isNotificationPolicyAccessGranted
     var longPressedApp by remember { mutableStateOf<AppModel?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val sheetTopOffset = LocalConfiguration.current.screenHeightDp.dp * 0.1f
@@ -227,12 +230,15 @@ fun HomeScreen(
         }
     }
 
-    val filteredApps = remember(apps, selectedLetter, selectedCategory) {
-        apps.filter { app ->
-            val letterMatch = selectedLetter == null || app.label.firstOrNull()?.uppercaseChar() == selectedLetter
-            val categoryMatch = selectedCategory == null || app.category == selectedCategory
-            letterMatch && categoryMatch
-        }
+    val filteredApps = remember(apps, selectedLetter, selectedCategory, categoryOrder) {
+        val orderMap = categoryOrder.withIndex().associate { (index, category) -> category to index }
+        apps
+            .filter { app ->
+                val letterMatch = selectedLetter == null || app.label.firstOrNull()?.uppercaseChar() == selectedLetter
+                val categoryMatch = selectedCategory == null || app.category == selectedCategory
+                letterMatch && categoryMatch
+            }
+            .sortedWith(compareBy({ orderMap[it.category] ?: it.category.order }, { it.label.lowercase() }))
     }
 
     val dockApps = remember(apps, dockPackages, isDockCustomized) {
@@ -262,6 +268,7 @@ fun HomeScreen(
             })
             CategoryFilter(
                 availableCategories = availableCategories,
+                categoryOrder = categoryOrder,
                 selectedCategory = selectedCategory,
                 onCategoryClick = { cat ->
                     selectedCategory = if (selectedCategory == cat) null else cat
@@ -751,13 +758,15 @@ private fun MiniWidget(label: String, pct: Int, detail: String) {
 @Composable
 private fun CategoryFilter(
     availableCategories: Set<AppCategory>,
+    categoryOrder: List<AppCategory>,
     selectedCategory: AppCategory?,
     onCategoryClick: (AppCategory) -> Unit,
 ) {
-    val categories = remember(availableCategories) {
+    val categories = remember(availableCategories, categoryOrder) {
+        val orderMap = categoryOrder.withIndex().associate { (index, category) -> category to index }
         AppCategory.entries
             .filter { it in availableCategories }
-            .sortedBy { it.order }
+            .sortedWith(compareBy({ orderMap[it] ?: it.order }, { it.label }))
     }
 
     LazyRow(
@@ -866,3 +875,7 @@ private fun DockRow(
         }
     }
 }
+
+
+
+
