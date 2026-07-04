@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "skills": {
+    "android-accessibility": {
+      "source": "new-silvermoon/awesome-android-agent-skills",
+      "sourceType": "github",
+      "skillPath": ".github/skills/ui/android-accessibility/SKILL.md",
+      "computedHash": "85468a24bc8850ff20514ef95f4489c8cd9931a739043e0f39ab78f1781b9082"
+    },
+    "compose-navigation": {
+      "source": "new-silvermoon/awesome-android-agent-skills",
+      "sourceType": "github",
+      "skillPath": ".github/skills/ui/compose-navigation/SKILL.md",
+      "computedHash": "2f956a21d7709665af4ffd64555e58a90fb5880efc94b8d8d32872fa278d873e"
+    },
+    "compose-performance-audit": {
+      "source": "new-silvermoon/awesome-android-agent-skills",
+      "sourceType": "github",
+      "skillPath": ".github/skills/performance/compose-performance-audit/SKILL.md",
+      "computedHash": "5d9bd6d8803a2721fc9a0c4fab67c9ec25d58f58eed87e1b144c88bc54ce2196"
+    },
+    "maestro-mobile-testing": {
+      "source": "tovimx/maestro-mobile-testing-skill",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "0da465e616e3c96744ba5d0641054c4468e7bd801cde67ba6a915a89cfe465d3"
+    }
+  }
+}

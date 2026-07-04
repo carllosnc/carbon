@@ -1,0 +1,4 @@
+interface:
+  display_name: "Git Commit Workflow"
+  short_description: "Structured Git review, commit, and push workflow for Carbon."
+  default_prompt: "Use this skill to review changes, group commits, write Conventional Commit messages, and push safely."
