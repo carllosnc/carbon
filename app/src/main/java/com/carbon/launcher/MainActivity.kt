@@ -51,6 +51,7 @@ import com.carbon.launcher.data.AppCategory
 import com.carbon.launcher.data.AppModel
 import com.carbon.launcher.data.CategoryOrderPref
 import com.carbon.launcher.data.DockPref
+import com.carbon.launcher.data.DynamicColorPref
 import com.carbon.launcher.data.LockDeviceAdminReceiver
 import com.carbon.launcher.data.NotificationBadgeService
 import com.carbon.launcher.data.WallpaperPref
@@ -132,6 +133,7 @@ class MainActivity : ComponentActivity() {
     private var batteryPercent by mutableStateOf(0)
     private var batteryCharging by mutableStateOf(false)
     private var carbonDarkTheme by mutableStateOf(true)
+    private var dynamicColorEnabled by mutableStateOf(false)
     private var wallpaperResId by mutableStateOf(0)
     private var dockPackages by mutableStateOf<List<String>>(emptyList())
     private var categoryOrder by mutableStateOf<List<AppCategory>>(emptyList())
@@ -178,8 +180,9 @@ class MainActivity : ComponentActivity() {
         dockPackages = DockPref.get(this)
         categoryOrder = CategoryOrderPref.get(this)
         isDockCustomized = DockPref.isConfigured(this)
+        dynamicColorEnabled = DynamicColorPref.get(this)
         setContent {
-            CarbonTheme(darkTheme = carbonDarkTheme) {
+            CarbonTheme(darkTheme = carbonDarkTheme, dynamicColor = dynamicColorEnabled) {
                 val navController = rememberNavController()
                 val vm: LauncherViewModel = viewModel()
                 val state by vm.state.collectAsState()
@@ -347,6 +350,12 @@ class MainActivity : ComponentActivity() {
                     carbonDarkTheme = !carbonDarkTheme
                 }
 
+                fun toggleDynamicColor() {
+                    val enabled = !dynamicColorEnabled
+                    dynamicColorEnabled = enabled
+                    DynamicColorPref.save(this@MainActivity, enabled)
+                }
+
                 fun toggleAirplaneMode() {
                     Toast.makeText(this@MainActivity, "Airplane mode is restricted by Android", Toast.LENGTH_SHORT).show()
                     openAirplaneModeSettings()
@@ -487,6 +496,7 @@ class MainActivity : ComponentActivity() {
                         composable(LauncherRoute.HOME) {
                             HomeScreen(
                                 apps = state.apps,
+                                isLoading = state.isLoading,
                                 onAppClick = ::launch,
                                 onAppUninstall = ::uninstall,
                                 onAppClearCache = ::openAppSettings,
@@ -545,6 +555,8 @@ class MainActivity : ComponentActivity() {
                                 isWriteSettingsGranted = writeSettingsGranted,
                                 isNotificationPolicyAccessGranted = notificationPolicyAccessGranted,
                                 isDeveloperModeEnabled = developerModeEnabled,
+                                isDynamicColorEnabled = dynamicColorEnabled,
+                                onToggleDynamicColor = ::toggleDynamicColor,
                                 appCount = state.apps.size,
                             )
                         }

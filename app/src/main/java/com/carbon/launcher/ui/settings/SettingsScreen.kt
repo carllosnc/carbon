@@ -1,5 +1,6 @@
 package com.carbon.launcher.ui.settings
 
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Wallpaper
@@ -34,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -62,6 +65,8 @@ fun SettingsScreen(
     isWriteSettingsGranted: Boolean,
     isNotificationPolicyAccessGranted: Boolean,
     isDeveloperModeEnabled: Boolean,
+    isDynamicColorEnabled: Boolean,
+    onToggleDynamicColor: () -> Unit,
     appCount: Int,
     modifier: Modifier = Modifier,
 ) {
@@ -155,6 +160,20 @@ fun SettingsScreen(
                 leading = { SettingsIcon(Icons.Outlined.Wallpaper) },
                 onClick = onOpenWallpaperPicker,
             )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                ListItemRow(
+                    title = "Dynamic color",
+                    subtitle = "Match colors to your wallpaper (Material You)",
+                    leading = { SettingsIcon(Icons.Outlined.Palette) },
+                    trailing = {
+                        Switch(
+                            checked = isDynamicColorEnabled,
+                            onCheckedChange = { onToggleDynamicColor() },
+                        )
+                    },
+                    onClick = onToggleDynamicColor,
+                )
+            }
 
 
             HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(vertical = 8.dp))
