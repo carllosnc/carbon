@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.carbon.launcher.data.AppModel
 import com.carbon.launcher.data.AppRepository
+import com.carbon.launcher.data.DockPref
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,7 +16,7 @@ data class LauncherState(
     val isLoading: Boolean = true,
     val query: String = "",
 ) {
-    val dockApps: List<AppModel> get() = apps.take(5)
+    val dockApps: List<AppModel> get() = apps.take(DockPref.MAX_DOCK_APPS)
 }
 
 class LauncherViewModel(app: Application) : AndroidViewModel(app) {
@@ -38,3 +39,4 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         _state.value = _state.value.copy(query = q)
     }
 }
+

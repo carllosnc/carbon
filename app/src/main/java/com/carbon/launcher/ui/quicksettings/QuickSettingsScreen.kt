@@ -366,16 +366,21 @@ private fun BatteryTile(
         else -> Color(0xFFFF453A)
     }
     val foreground = Color.White
-    val transition = rememberInfiniteTransition(label = "battery-charge")
-    val chargeSweep by transition.animateFloat(
-        initialValue = -0.35f,
-        targetValue = 1.35f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1500),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "battery-charge-sweep",
-    )
+    val chargeSweep = if (isCharging) {
+        val transition = rememberInfiniteTransition(label = "battery-charge")
+        val animatedSweep by transition.animateFloat(
+            initialValue = -0.35f,
+            targetValue = 1.35f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1250),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "battery-charge-sweep",
+        )
+        animatedSweep
+    } else {
+        0f
+    }
 
     Box(
         modifier = modifier
@@ -386,19 +391,24 @@ private fun BatteryTile(
     ) {
         if (isCharging) {
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val bandWidth = size.width * 0.34f
+                val bandWidth = size.width * 0.48f
                 val startX = (size.width + bandWidth) * chargeSweep - bandWidth
                 drawRect(
                     brush = Brush.linearGradient(
                         colors = listOf(
                             Color.Transparent,
-                            Color.White.copy(alpha = 0.34f),
+                            Color.White.copy(alpha = 0.58f),
                             Color.Transparent,
                         ),
                         start = Offset(startX, 0f),
                         end = Offset(startX + bandWidth, size.height),
                     ),
                     size = size,
+                )
+                drawRect(
+                    color = Color.White.copy(alpha = 0.12f),
+                    topLeft = Offset(startX + bandWidth * 0.34f, 0f),
+                    size = androidx.compose.ui.geometry.Size(bandWidth * 0.24f, size.height),
                 )
             }
         }
@@ -670,7 +680,4 @@ private fun ControlIcon(icon: ImageVector) {
         )
     }
 }
-
-
-
 

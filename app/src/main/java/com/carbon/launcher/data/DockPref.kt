@@ -5,7 +5,7 @@ import android.content.SharedPreferences
 
 object DockPref {
     private const val KEY_DOCK_PACKAGES = "dock_packages"
-    private const val MAX_DOCK_APPS = 5
+    const val MAX_DOCK_APPS = 12
 
     private fun prefs(context: Context): SharedPreferences =
         context.getSharedPreferences("carbon_dock", Context.MODE_PRIVATE)

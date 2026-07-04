@@ -24,6 +24,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -56,8 +61,48 @@ import com.carbon.launcher.ui.settings.CategoryOrderScreen
 import com.carbon.launcher.ui.settings.SettingsScreen
 import com.carbon.launcher.ui.theme.CarbonTheme
 import com.carbon.launcher.ui.wallpaper.WallpaperPickerScreen
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
+
+@Composable
+private fun TopDockToast(message: String?) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.statusBars),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        AnimatedVisibility(
+            visible = message != null,
+            enter = fadeIn(animationSpec = tween(120)) + slideInVertically(animationSpec = tween(180)) { -it },
+            exit = fadeOut(animationSpec = tween(120)) + slideOutVertically(animationSpec = tween(160)) { -it },
+        ) {
+            Text(
+                text = message.orEmpty(),
+                color = Color(0xFF17151C),
+                fontWeight = FontWeight.Normal,
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .padding(top = 14.dp, start = 20.dp, end = 20.dp)
+                    .background(Color.White.copy(alpha = 0.86f), RoundedCornerShape(999.dp))
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+            )
+        }
+    }
+}
 private object LauncherRoute {
     const val HOME = "home"
     const val SETTINGS = "settings"
@@ -91,6 +136,8 @@ class MainActivity : ComponentActivity() {
     private var dockPackages by mutableStateOf<List<String>>(emptyList())
     private var categoryOrder by mutableStateOf<List<AppCategory>>(emptyList())
     private var isDockCustomized by mutableStateOf(false)
+    private var topToastMessage by mutableStateOf<String?>(null)
+    private var topToastKey by mutableStateOf(0)
     private val handler = Handler(Looper.getMainLooper())
 
     private val packageRemovedReceiver = object : BroadcastReceiver() {
@@ -106,6 +153,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            updateBatteryState(intent)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -115,6 +168,11 @@ class MainActivity : ComponentActivity() {
             IntentFilter(Intent.ACTION_PACKAGE_REMOVED),
             Context.RECEIVER_NOT_EXPORTED,
         )
+        registerReceiver(
+            batteryReceiver,
+            IntentFilter(Intent.ACTION_BATTERY_CHANGED),
+            Context.RECEIVER_NOT_EXPORTED,
+        )?.let(::updateBatteryState)
         refreshPermissionStatus()
         wallpaperResId = WallpaperPref.get(this)
         dockPackages = DockPref.get(this)
@@ -126,6 +184,13 @@ class MainActivity : ComponentActivity() {
                 val vm: LauncherViewModel = viewModel()
                 val state by vm.state.collectAsState()
                 val badgeSubtitles by NotificationBadgeService.badgeNotificationsFlow.collectAsState(emptyMap())
+
+                LaunchedEffect(topToastKey) {
+                    if (topToastMessage != null) {
+                        delay(1800)
+                        topToastMessage = null
+                    }
+                }
 
                 fun launch(app: AppModel) {
                     val intent = packageManager.getLaunchIntentForPackage(app.packageName)
@@ -363,10 +428,11 @@ class MainActivity : ComponentActivity() {
                 }
 
                 fun addToDock(app: AppModel) {
-                    val updatedPackages = (dockPackages + app.packageName).distinct().take(5)
+                    val updatedPackages = (dockPackages + app.packageName).distinct().take(DockPref.MAX_DOCK_APPS)
                     dockPackages = updatedPackages
                     isDockCustomized = true
                     DockPref.save(this@MainActivity, updatedPackages)
+                    showTopToast("${app.label} added to dock")
                 }
 
                 fun removeFromDock(app: AppModel) {
@@ -374,6 +440,7 @@ class MainActivity : ComponentActivity() {
                     dockPackages = updatedPackages
                     isDockCustomized = true
                     DockPref.save(this@MainActivity, updatedPackages)
+                    showTopToast("${app.label} removed from dock")
                 }
 
                 Box(modifier = Modifier.fillMaxSize()) {
@@ -532,6 +599,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
+                    TopDockToast(message = topToastMessage)
                 }
             }
         }
@@ -553,6 +621,11 @@ class MainActivity : ComponentActivity() {
                 }
             }, 500)
         }
+    }
+
+    private fun showTopToast(message: String) {
+        topToastMessage = message
+        topToastKey++
     }
 
     private fun refreshPermissionStatus() {
@@ -637,6 +710,28 @@ class MainActivity : ComponentActivity() {
         return Settings.Secure.getInt(contentResolver, Settings.Secure.LOCATION_MODE, Settings.Secure.LOCATION_MODE_OFF) !=
             Settings.Secure.LOCATION_MODE_OFF
     }
+    private fun updateBatteryState(intent: Intent?) {
+        val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        batteryPercent = if (level >= 0 && scale > 0) {
+            ((level * 100f) / scale).roundToInt().coerceIn(0, 100)
+        } else {
+            readBatteryPercent()
+        }
+        batteryCharging = isChargingIntent(intent)
+    }
+
+    private fun isChargingIntent(intent: Intent?): Boolean {
+        val status = intent?.getIntExtra(
+            BatteryManager.EXTRA_STATUS,
+            BatteryManager.BATTERY_STATUS_UNKNOWN,
+        ) ?: BatteryManager.BATTERY_STATUS_UNKNOWN
+        val plugged = intent?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
+        return status == BatteryManager.BATTERY_STATUS_CHARGING ||
+            status == BatteryManager.BATTERY_STATUS_FULL ||
+            plugged != 0
+    }
+
     private fun readBatteryPercent(): Int {
         val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
         val capacity = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
@@ -665,14 +760,7 @@ class MainActivity : ComponentActivity() {
     }
     private fun isBatteryCharging(): Boolean {
         val batteryStatus = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-        val status = batteryStatus?.getIntExtra(
-            BatteryManager.EXTRA_STATUS,
-            BatteryManager.BATTERY_STATUS_UNKNOWN,
-        ) ?: BatteryManager.BATTERY_STATUS_UNKNOWN
-        val plugged = batteryStatus?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
-        return status == BatteryManager.BATTERY_STATUS_CHARGING ||
-            status == BatteryManager.BATTERY_STATUS_FULL ||
-            plugged != 0
+        return isChargingIntent(batteryStatus)
     }
 
     private fun readBrightnessLevel(): Float {
@@ -698,11 +786,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         unregisterReceiver(packageRemovedReceiver)
+        unregisterReceiver(batteryReceiver)
     }
 }
-
-
-
-
-
 

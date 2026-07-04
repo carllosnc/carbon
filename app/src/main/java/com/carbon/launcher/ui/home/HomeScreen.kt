@@ -98,6 +98,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import com.carbon.launcher.data.AppCategory
+import com.carbon.launcher.data.DockPref
 import com.carbon.launcher.data.AppModel
 import com.carbon.launcher.ui.components.AppList
 import com.carbon.launcher.ui.components.ListItemRow
@@ -244,7 +245,7 @@ fun HomeScreen(
     val dockApps = remember(apps, dockPackages, isDockCustomized) {
         val appMap = apps.associateBy { it.packageName }
         if (isDockCustomized) {
-            dockPackages.mapNotNull { appMap[it] }.take(5)
+            dockPackages.mapNotNull { appMap[it] }.take(DockPref.MAX_DOCK_APPS)
         } else {
             val slotPackages = listOf(
                 listOf("com.google.android.dialer", "com.android.dialer", "com.android.phone"),
@@ -362,7 +363,7 @@ fun HomeScreen(
                 AppInfoSheet(
                     app = app,
                     isInDock = isDockCustomized && app.packageName in dockPackages,
-                    canAddToDock = dockPackages.size < 5,
+                    canAddToDock = dockPackages.size < DockPref.MAX_DOCK_APPS,
                     onAddToDock = {
                         longPressedApp = null
                         onAddToDock(app)
@@ -832,44 +833,31 @@ private fun DockRow(
                 )
             },
     ) {
-        AnimatedContent(
-            targetState = apps,
-            transitionSpec = {
-                (fadeIn(animationSpec = tween(durationMillis = 180)) +
-                    scaleIn(animationSpec = tween(durationMillis = 180), initialScale = 0.96f))
-                    .togetherWith(
-                        fadeOut(animationSpec = tween(durationMillis = 120)) +
-                            scaleOut(animationSpec = tween(durationMillis = 120), targetScale = 0.96f),
-                    )
-            },
-            label = "dock-apps",
-        ) { targetApps ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                targetApps.forEach { app ->
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .combinedClickable(
-                                onClick = { onAppClick(app) },
-                                onLongClick = { onAppLongClick(app) },
-                            )
-                            .padding(8.dp),
-                    ) {
-                        Image(
-                            bitmap = app.icon.toImageBitmap(),
-                            contentDescription = app.label,
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(12.dp)),
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            items(apps, key = { it.packageName }) { app ->
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .animateItem()
+                        .clip(RoundedCornerShape(16.dp))
+                        .combinedClickable(
+                            onClick = { onAppClick(app) },
+                            onLongClick = { onAppLongClick(app) },
                         )
-                    }
+                        .padding(8.dp),
+                ) {
+                    Image(
+                        bitmap = app.icon.toImageBitmap(),
+                        contentDescription = app.label,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                    )
                 }
             }
         }
