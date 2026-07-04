@@ -182,6 +182,7 @@ fun HomeScreen(
     isLockScreenAdminGranted: Boolean = false,
     isWriteSettingsGranted: Boolean = false,
     isNotificationPolicyAccessGranted: Boolean = false,
+    isLoading: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val hasMissingPermission = !isUsageAccessGranted || !isNotificationAccessGranted || !isDefaultLauncher || !isLockScreenAdminGranted || !isWriteSettingsGranted || !isNotificationPolicyAccessGranted
@@ -262,88 +263,116 @@ fun HomeScreen(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            ClockWidget()
-            LetterBar(availableLetters = availableLetters, selectedLetter = selectedLetter, onLetterClick = { letter ->
-                selectedLetter = if (selectedLetter == letter) null else letter
-            })
-            CategoryFilter(
-                availableCategories = availableCategories,
-                categoryOrder = categoryOrder,
-                selectedCategory = selectedCategory,
-                onCategoryClick = { cat ->
-                    selectedCategory = if (selectedCategory == cat) null else cat
-                },
-            )
-
-            AppList(
-                apps = filteredApps,
-                onAppClick = onAppClick,
-                onAppLongClick = { longPressedApp = it },
-                badgeSubtitles = badgeSubtitles,
-                labelColor = Color.White,
-                subtitleColor = Color.White.copy(alpha = 0.68f),
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-            )
-
-            DockRow(
-                apps = dockApps,
-                onAppClick = onAppClick,
-                onAppLongClick = { longPressedApp = it },
-            )
-        }
-
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(end = 20.dp, bottom = 116.dp),
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            FloatingActionButton(
-                onClick = onOpenQuickSettings,
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Tune,
-                    contentDescription = "Open quick settings",
-                    modifier = Modifier.size(24.dp),
-                )
-            }
-            FloatingActionButton(
-                onClick = onLockScreen,
-                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Lock,
-                    contentDescription = "Lock screen",
-                    modifier = Modifier.size(24.dp),
-                )
-            }
-            Box {
-                FloatingActionButton(
-                    onClick = onOpenSettings,
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        val showLoading = isLoading && apps.isEmpty()
+        AnimatedContent(
+            targetState = showLoading,
+            transitionSpec = {
+                if (targetState) {
+                    fadeIn(tween(180)) togetherWith fadeOut(tween(220))
+                } else {
+                    fadeIn(tween(320)) togetherWith fadeOut(tween(180))
+                }
+            },
+            label = "home-launch",
+        ) { loading ->
+            if (loading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Settings,
-                        contentDescription = "Open settings",
-                        modifier = Modifier.size(24.dp),
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(32.dp),
                     )
                 }
-                if (hasMissingPermission) {
-                    Box(
+            } else {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        ClockWidget()
+                        LetterBar(availableLetters = availableLetters, selectedLetter = selectedLetter, onLetterClick = { letter ->
+                            selectedLetter = if (selectedLetter == letter) null else letter
+                        })
+                        CategoryFilter(
+                            availableCategories = availableCategories,
+                            categoryOrder = categoryOrder,
+                            selectedCategory = selectedCategory,
+                            onCategoryClick = { cat ->
+                                selectedCategory = if (selectedCategory == cat) null else cat
+                            },
+                        )
+
+                        AppList(
+                            apps = filteredApps,
+                            onAppClick = onAppClick,
+                            onAppLongClick = { longPressedApp = it },
+                            badgeSubtitles = badgeSubtitles,
+                            labelColor = Color.White,
+                            subtitleColor = Color.White.copy(alpha = 0.68f),
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                        )
+
+                        DockRow(
+                            apps = dockApps,
+                            onAppClick = onAppClick,
+                            onAppLongClick = { longPressedApp = it },
+                        )
+                    }
+
+                    Column(
                         modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .offset(x = (-2).dp, y = (-2).dp)
-                            .size(16.dp)
-                            .background(Color(0xFFFF4444), CircleShape)
-                            .border(1.dp, Color.White, CircleShape),
-                    )
+                            .align(Alignment.BottomEnd)
+                            .windowInsetsPadding(WindowInsets.navigationBars)
+                            .padding(end = 20.dp, bottom = 116.dp),
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        FloatingActionButton(
+                            onClick = onOpenQuickSettings,
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Tune,
+                                contentDescription = "Open quick settings",
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
+                        FloatingActionButton(
+                            onClick = onLockScreen,
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Lock,
+                                contentDescription = "Lock screen",
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
+                        Box {
+                            FloatingActionButton(
+                                onClick = onOpenSettings,
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Settings,
+                                    contentDescription = "Open settings",
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
+                            if (hasMissingPermission) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopStart)
+                                        .offset(x = (-2).dp, y = (-2).dp)
+                                        .size(16.dp)
+                                        .background(Color(0xFFFF4444), CircleShape)
+                                        .border(1.dp, Color.White, CircleShape),
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
